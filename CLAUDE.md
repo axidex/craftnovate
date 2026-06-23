@@ -10,7 +10,15 @@ npm/PyPI/Maven registries. Architecture & full CLI reference live in README.md.
   run fails with "undefined: newRootCmd").
 - `make test` (hermetic, no network) · `make test-race` · `make test-e2e`
   (live OSV+Maven, needs network) · `make cover` · `make build`.
-- Before finishing: `gofmt -s -w .` and `go test -race ./...`.
+- `make lint` (golangci-lint v2, `.golangci.yml`) · `make snapshot` /
+  `make release-check` (GoReleaser dry-run / validate).
+- Before finishing: `gofmt -s -w .`, `go test -race ./...`, `golangci-lint run ./...`.
+- CI in `.github/workflows/` (ci.yml: test+lint+govulncheck; release.yml:
+  GoReleaser on `v*` tags + a `workflow_dispatch` major/minor/patch dropdown).
+- Release (semver, tag-driven; version computed, not hand-counted):
+  `make release-patch|release-minor|release-major` → `scripts/release.sh` bumps
+  the latest tag and pushes it → release.yml builds. The tag is the version
+  source (`-X main.version`).
 
 ## CLI (cobra + viper)
 - Flag value resolves: flag → env `DEPSCAN_*` (dashes→underscores) →
@@ -39,6 +47,17 @@ npm/PyPI/Maven registries. Architecture & full CLI reference live in README.md.
 - OSV affected-name match: Maven names are `group:artifact` (colon); PyPI needs
   PEP 503 normalization (`[-_.]+`→`-`, lowercased).
 - Maven Central returns HTTP 200 with `numFound:0` for missing packages (no 404).
+
+## CI / release gotchas
+- golangci-lint v2: suppress gosec with `//nolint:gosec // reason` — it ignores
+  `//nosec`. `.golangci.yml` excludes gosec G104 (errcheck covers it) + the
+  `std-error-handling` preset; `_test.go` is exempt from errcheck/gosec/funlen.
+- CI test matrix is 1.26+ only — go.mod pins `go 1.26.3`, so 1.25 fails the build.
+- Immutable releases are **draft-first**: keep `release.draft: true` in
+  `.goreleaser.yaml`; release.yml publishes via `gh release edit --draft=false`.
+  Flipping to `draft: false` breaks asset upload once immutability is enabled.
+- Writing `.github/workflows/*` trips a security-reminder hook that denies the
+  first Write — just re-issue it.
 
 ## Conventions
 Follow the `.agents/skills/golang-*` (samber) skills: stdlib-first, minimal

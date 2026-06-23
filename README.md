@@ -163,6 +163,62 @@ tests — `go test ./...` runs fully offline. The `e2e/` package bundles a real
 suite, while a live full-pipeline test (build tag `e2e`) scans it against OSV
 and Maven Central and asserts SARIF 2.1.0 validity.
 
+## CI & releases
+
+GitHub Actions (`.github/workflows/`):
+
+- **ci.yml** — on every push/PR: tests (Go 1.26 + stable, `-race -shuffle=on`,
+  coverage), `go vet` + golangci-lint, and `govulncheck`.
+- **release.yml** — on a `v*` tag: [GoReleaser](https://goreleaser.com) builds
+  **static** (`CGO_ENABLED=0`), reproducible (`-trimpath`) binaries for
+  linux/darwin/windows × amd64/arm64, archives, `checksums.txt`, SLSA build
+  provenance, and a GitHub Release with an auto-generated changelog.
+
+### Cutting a release
+
+Releases are **semver, tag-driven**, and the next version is **computed for you** —
+pick the bump, never do version math:
+
+```bash
+# From your terminal — compute the next tag from the latest one and push it:
+make release-patch   # vX.Y.(Z+1)   (bug fixes)
+make release-minor   # vX.(Y+1).0   (features)
+make release-major   # v(X+1).0.0   (breaking changes)
+```
+
+Or run the **Release** workflow from the GitHub Actions UI and pick
+`major`/`minor`/`patch` from the dropdown — it computes and pushes the next
+`vX.Y.Z` tag, then releases (the GitHub equivalent of vercraft's
+`makeRelease -PreleaseType=…`). Pushing a tag by hand
+(`git tag v1.2.3 && git push origin v1.2.3`) works too.
+
+Any of these triggers GoReleaser, which derives the version from the tag
+(`git describe`: `v1.2.3` → `1.2.3`) and stamps it into the binary:
+
+```bash
+depscan --version    # 1.2.3 (commit abc1234, built …)
+make release-check   # validate the GoReleaser config
+make snapshot        # local cross-platform dry-run into dist/ (no publish)
+```
+
+### Immutable releases
+
+Enable repo **Settings → Releases → "Enable release immutability"** (GA since
+2025-10-28). Once on, a published release's assets and its git tag are locked —
+they cannot be modified, moved, or deleted, which blocks supply-chain tampering.
+The pipeline is **draft-first** (GoReleaser uploads to a draft, then the workflow
+publishes) because publishing is what locks the assets. Verify artifacts anywhere:
+
+```bash
+gh release verify v1.2.3                                   # GitHub release attestation
+gh attestation verify depscan_1.2.3_linux_amd64.tar.gz --repo axidex/depscan
+```
+
+> The linked `vercraft` is a Gradle/JVM plugin with no Go binary, so it isn't used
+> here. To *auto-compute* the next version from conventional commits instead of
+> tagging by hand, add [release-please](https://github.com/googleapis/release-please) —
+> it opens a release PR and creates the `vX.Y.Z` tag this pipeline consumes.
+
 ## Out of scope (first iteration)
 
 PR creation, SBOM generation, repository listing, EPSS/KEV prioritization, and

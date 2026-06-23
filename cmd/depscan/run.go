@@ -77,7 +77,7 @@ func runScan(ctx context.Context, cfg config, stdout, stderr io.Writer) error {
 	if err := writeSARIF(cfg.outPath, rep.Verdicts, stdout); err != nil {
 		return err
 	}
-	if cfg.format == "table" {
+	if cfg.format == formatTable {
 		if err := report.Table(stdout, rep.Verdicts); err != nil {
 			return err
 		}
@@ -96,7 +96,7 @@ func loadComponents(path string) ([]sbom.Component, int, error) {
 	if path == "-" {
 		return sbom.Parse(os.Stdin)
 	}
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // G304: the SBOM path is an explicit CLI argument, not attacker-controlled
 	if err != nil {
 		return nil, 0, fmt.Errorf("open SBOM: %w", err)
 	}
@@ -114,7 +114,7 @@ func writeSARIF(outPath string, verdicts []verdict.Verdict, stdout io.Writer) er
 	if outPath == "-" {
 		return sarif.Render(stdout, verdicts, meta)
 	}
-	f, err := os.Create(outPath)
+	f, err := os.Create(outPath) //nolint:gosec // G304: the output path is an explicit CLI argument, not attacker-controlled
 	if err != nil {
 		return fmt.Errorf("create output: %w", err)
 	}

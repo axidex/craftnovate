@@ -16,7 +16,7 @@ import (
 // osvServer is a configurable fake OSV API.
 type osvServer struct {
 	srv          *httptest.Server
-	hydrateCount int64 // total GET /vulns/{id} calls (to assert caching)
+	hydrateCount atomic.Int64 // total GET /vulns/{id} calls (to assert caching)
 }
 
 func newOSVServer(t *testing.T) *osvServer {
@@ -98,7 +98,7 @@ func newOSVServer(t *testing.T) *osvServer {
 	})
 
 	mux.HandleFunc("/v1/vulns/", func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt64(&o.hydrateCount, 1)
+		o.hydrateCount.Add(1)
 		id := strings.TrimPrefix(r.URL.Path, "/v1/vulns/")
 		if id == "PAGE-1" || id == "PAGE-2" {
 			json.NewEncoder(w).Encode(map[string]any{"id": id})
@@ -164,7 +164,7 @@ func TestOSVClient_HydrationCaching(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
-	if n := atomic.LoadInt64(&o.hydrateCount); n != 1 {
+	if n := o.hydrateCount.Load(); n != 1 {
 		t.Errorf("hydrateCount = %d, want 1 (shared ID hydrated once)", n)
 	}
 }

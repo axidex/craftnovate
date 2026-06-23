@@ -28,6 +28,12 @@ type config struct {
 	logger *slog.Logger
 }
 
+// Output format values for the --format flag.
+const (
+	formatSARIF = "sarif"
+	formatTable = "table"
+)
+
 const longDescription = `depscan analyzes a CycloneDX JSON SBOM and writes a SARIF 2.1.0 report with an
 update verdict for every component:
 
@@ -49,12 +55,12 @@ func newRootCmd() *cobra.Command {
 		Use:           "depscan",
 		Short:         "SBOM (CycloneDX JSON) → SARIF dependency verdicts",
 		Long:          longDescription,
-		Version:       version,
+		Version:       versionString(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				return &usageError{msg: fmt.Sprintf("unexpected arguments: %s", strings.Join(args, " "))}
+				return &usageError{msg: "unexpected arguments: " + strings.Join(args, " ")}
 			}
 			return nil
 		},
@@ -75,7 +81,7 @@ func newRootCmd() *cobra.Command {
 	flags.StringP("out", "o", "results.sarif", "path to write the SARIF report ('-' for stdout)")
 	flags.Bool("offline", false, "skip registry (outdated) lookups for air-gapped environments")
 	flags.String("fail-on", "", "exit non-zero if any finding is at this level or higher: must-update|should-update")
-	flags.String("format", "sarif", "stdout format: sarif (file only) or table (also print a table)")
+	flags.String("format", formatSARIF, "stdout format: sarif (file only) or table (also print a table)")
 	flags.Int("concurrency", 8, "max concurrent registry/OSV requests")
 	flags.Duration("timeout", 2*time.Minute, "overall scan timeout")
 	flags.Bool("debug", false, "enable verbose debug logging to stderr")
@@ -142,10 +148,10 @@ func configFromViper(v *viper.Viper) (config, error) {
 	if err := validateFailOn(cfg.failOn); err != nil {
 		return config{}, &usageError{msg: err.Error()}
 	}
-	if cfg.format != "sarif" && cfg.format != "table" {
+	if cfg.format != formatSARIF && cfg.format != formatTable {
 		return config{}, &usageError{msg: fmt.Sprintf("invalid --format %q: want sarif or table", cfg.format)}
 	}
-	if cfg.format == "table" && cfg.outPath == "-" {
+	if cfg.format == formatTable && cfg.outPath == "-" {
 		return config{}, &usageError{msg: "--format table cannot be combined with --out=-: both would write to stdout and corrupt the SARIF stream"}
 	}
 	return cfg, nil

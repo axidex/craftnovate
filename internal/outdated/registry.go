@@ -96,8 +96,10 @@ func NewNPMRegistry(client *http.Client) *NPMRegistry {
 	return &NPMRegistry{newHTTPRegistry(client)}
 }
 
+// Ecosystem implements RegistryChecker.
 func (r *NPMRegistry) Ecosystem() string { return "npm" }
 
+// Latest implements RegistryChecker.
 func (r *NPMRegistry) Latest(ctx context.Context, p purl.PURL) (string, error) {
 	// Scoped packages must carry an encoded "@": @scope/name -> %40scope/name.
 	pkgPath := strings.ReplaceAll(p.Coordinates(), "@", "%40")
@@ -125,8 +127,10 @@ func NewPyPIRegistry(client *http.Client) *PyPIRegistry {
 	return &PyPIRegistry{newHTTPRegistry(client)}
 }
 
+// Ecosystem implements RegistryChecker.
 func (r *PyPIRegistry) Ecosystem() string { return "pypi" }
 
+// Latest implements RegistryChecker.
 func (r *PyPIRegistry) Latest(ctx context.Context, p purl.PURL) (string, error) {
 	endpoint := "https://pypi.org/pypi/" + url.PathEscape(p.Name) + "/json"
 
@@ -154,8 +158,10 @@ func NewMavenRegistry(client *http.Client) *MavenRegistry {
 	return &MavenRegistry{newHTTPRegistry(client)}
 }
 
+// Ecosystem implements RegistryChecker.
 func (r *MavenRegistry) Ecosystem() string { return "maven" }
 
+// Latest implements RegistryChecker.
 func (r *MavenRegistry) Latest(ctx context.Context, p purl.PURL) (string, error) {
 	// purl maps groupId -> namespace, artifactId -> name.
 	if p.Namespace == "" {

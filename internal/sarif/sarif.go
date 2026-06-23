@@ -39,15 +39,18 @@ type Log struct {
 	Runs    []Run  `json:"runs"`
 }
 
+// Run is a single analysis run within a SARIF log.
 type Run struct {
 	Tool    Tool     `json:"tool"`
 	Results []Result `json:"results"`
 }
 
+// Tool describes the analysis tool that produced the run.
 type Tool struct {
 	Driver Driver `json:"driver"`
 }
 
+// Driver is the tool's primary analysis component and its rule catalog.
 type Driver struct {
 	Name           string `json:"name"`
 	Version        string `json:"version,omitempty"`
@@ -55,6 +58,7 @@ type Driver struct {
 	Rules          []Rule `json:"rules"`
 }
 
+// Rule is a reportingDescriptor: the definition a result references by ruleId.
 type Rule struct {
 	ID                   string         `json:"id"`
 	Name                 string         `json:"name,omitempty"`
@@ -65,10 +69,12 @@ type Rule struct {
 	Properties           map[string]any `json:"properties,omitempty"`
 }
 
+// RuleConfig holds a rule's default reporting configuration (its level).
 type RuleConfig struct {
 	Level string `json:"level"`
 }
 
+// Result is one finding: a component with a non-ok verdict.
 type Result struct {
 	RuleID              string            `json:"ruleId"`
 	RuleIndex           int               `json:"ruleIndex"`
@@ -79,14 +85,18 @@ type Result struct {
 	Properties          map[string]any    `json:"properties,omitempty"`
 }
 
+// Message is a SARIF text message.
 type Message struct {
 	Text string `json:"text"`
 }
 
+// Location ties a result to a place; for dependencies that is a logical
+// (package) location rather than a file region.
 type Location struct {
 	LogicalLocations []LogicalLocation `json:"logicalLocations,omitempty"`
 }
 
+// LogicalLocation names a non-file location, e.g. a package coordinate.
 type LogicalLocation struct {
 	Name string `json:"name"`
 	Kind string `json:"kind,omitempty"`
@@ -164,13 +174,13 @@ func buildRule(ruleID, problemType, base string) Rule {
 	if problemType == ruleVuln {
 		rule.Name = "VulnerableDependency"
 		rule.ShortDescription = &Message{Text: "Dependency has known vulnerabilities"}
-		rule.FullDescription = &Message{Text: fmt.Sprintf("%s has one or more known vulnerabilities reported by OSV.dev.", base)}
+		rule.FullDescription = &Message{Text: base + " has one or more known vulnerabilities reported by OSV.dev."}
 		rule.HelpURI = "https://osv.dev/list"
 		rule.DefaultConfiguration.Level = "error"
 	} else {
 		rule.Name = "OutdatedDependency"
 		rule.ShortDescription = &Message{Text: "A newer version of the dependency is available"}
-		rule.FullDescription = &Message{Text: fmt.Sprintf("%s is behind the latest version published in its registry.", base)}
+		rule.FullDescription = &Message{Text: base + " is behind the latest version published in its registry."}
 		rule.HelpURI = "https://github.com/axidex/depscan"
 	}
 	return rule
@@ -265,9 +275,6 @@ func ecosystemOf(raw string) string {
 // unchanged dependency even as OSV adds CVEs or a newer release ships, keeping
 // code-host alert continuity intact.
 func fingerprint(problemType, identity string) string {
-	h := sha256.New()
-	io.WriteString(h, problemType)
-	io.WriteString(h, "|")
-	io.WriteString(h, identity)
-	return hex.EncodeToString(h.Sum(nil))[:16]
+	sum := sha256.Sum256([]byte(problemType + "|" + identity))
+	return hex.EncodeToString(sum[:])[:16]
 }

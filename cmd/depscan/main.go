@@ -11,8 +11,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// version is overridden at build time via -ldflags "-X main.version=...".
-var version = "dev"
+// Build metadata, overridden at build time via -ldflags "-X main.version=..."
+// (GoReleaser sets all three).
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
+// versionString is the full --version line: semver plus build provenance.
+func versionString() string {
+	return fmt.Sprintf("%s (commit %s, built %s)", version, commit, date)
+}
 
 // errGate signals that the --fail-on threshold was met. It is not a failure of
 // the scan itself, so it maps to exit code 1 with no extra error output.

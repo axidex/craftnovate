@@ -50,7 +50,7 @@ func TestTable(t *testing.T) {
 	lodash := strings.Index(out, "lodash")
 	guava := strings.Index(out, "guava")
 	safe := strings.Index(out, "safe")
-	if !(lodash < guava && guava < safe) {
+	if lodash >= guava || guava >= safe {
 		t.Errorf("rows not sorted by severity (lodash<guava<safe): %d %d %d\n%s", lodash, guava, safe, out)
 	}
 

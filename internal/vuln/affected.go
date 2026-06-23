@@ -7,6 +7,10 @@ import (
 	"github.com/axidex/depscan/internal/purl"
 )
 
+// ecosystemPyPI is the purl type whose package names need PEP 503 normalization
+// when matching.
+const ecosystemPyPI = "pypi"
+
 // toVuln distills a hydrated OSV record into a domain Vuln for the package
 // identified by queriedPURL. Fixed-version extraction is scoped to the affected
 // entries that match the queried package so we never recommend a fix that
@@ -97,7 +101,7 @@ var pep503Separators = regexp.MustCompile(`[-_.]+`)
 // normalization for PyPI (lowercase; collapse runs of '-', '_', '.' to a
 // single '-') so that, e.g., "Flask.SQLAlchemy" matches "flask-sqlalchemy".
 func sameName(ecosystem, a, b string) bool {
-	if ecosystem == "pypi" {
+	if ecosystem == ecosystemPyPI {
 		return pep503(a) == pep503(b)
 	}
 	return strings.EqualFold(a, b)
@@ -177,33 +181,23 @@ func cveIDs(record osvVuln) []string {
 	return dedupeStrings(out)
 }
 
-// ecosystemToType maps an OSV ecosystem label to a purl type. The OSV
-// ecosystem string may carry a ":suffix" (e.g. "Alpine:v3.16") which is
-// stripped before mapping.
+// ecosystemToType maps an OSV ecosystem label to its purl type. Most OSV
+// ecosystem names already equal the lowercased purl type, so only the few that
+// differ are listed; everything else falls through unchanged. The OSV string
+// may carry a ":suffix" (e.g. "Alpine:v3.16"), which is dropped first.
 func ecosystemToType(ecosystem string) string {
 	base, _, _ := strings.Cut(ecosystem, ":")
-	switch strings.ToLower(strings.TrimSpace(base)) {
-	case "npm":
-		return "npm"
-	case "pypi":
-		return "pypi"
-	case "maven":
-		return "maven"
+	base = strings.ToLower(strings.TrimSpace(base))
+	switch base {
 	case "go":
 		return "golang"
 	case "crates.io":
 		return "cargo"
 	case "rubygems":
 		return "gem"
-	case "nuget":
-		return "nuget"
 	case "packagist":
 		return "composer"
-	case "hex":
-		return "hex"
-	case "pub":
-		return "pub"
 	default:
-		return strings.ToLower(strings.TrimSpace(base))
+		return base
 	}
 }

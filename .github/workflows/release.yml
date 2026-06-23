@@ -1,0 +1,101 @@
+name: Release
+
+# Two ways to release, both compute/consume a semver tag — no version math by hand:
+#   1. Run this workflow manually and pick major/minor/patch (the next vX.Y.Z tag
+#      is computed from the latest one, created, and released).
+#   2. Push a tag yourself: `git tag v1.2.3 && git push origin v1.2.3`
+#      (or locally: `make release-minor`).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      releaseType:
+        description: "Semver bump — the next vX.Y.Z tag is computed automatically"
+        type: choice
+        default: minor
+        options:
+          - major
+          - minor
+          - patch
+
+permissions:
+  contents: write # create the release and (on dispatch) push the tag
+  id-token: write # keyless signing for build provenance attestation
+  attestations: write # write the provenance attestation
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      # On manual dispatch: compute the next semver tag from the latest one and
+      # create + push it. On a tag push the tag already exists, so just use it.
+      - name: Resolve release tag
+        id: tag
+        env:
+          EVENT: ${{ github.event_name }}
+          BUMP: ${{ inputs.releaseType }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            latest=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n1)
+            latest=${latest:-v0.0.0}
+            core=${latest#v}; core=${core%%-*}
+            IFS=. read -r major minor patch <<< "$core"
+            major=${major:-0}; minor=${minor:-0}; patch=${patch:-0}
+            case "$BUMP" in
+              major) major=$((major + 1)); minor=0; patch=0 ;;
+              minor) minor=$((minor + 1)); patch=0 ;;
+              patch) patch=$((patch + 1)) ;;
+            esac
+            tag="v${major}.${minor}.${patch}"
+            if git rev-parse "$tag" >/dev/null 2>&1; then
+              echo "::error::tag $tag already exists" && exit 1
+            fi
+            echo "Bumping $latest -> $tag ($BUMP)"
+            git tag -a "$tag" -m "$tag"
+            git push origin "$tag"
+          else
+            tag="$REF_NAME"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # Builds static (CGO_ENABLED=0), reproducible (-trimpath) binaries and
+      # uploads them to a DRAFT release (required before publishing immutably).
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # SLSA build provenance for every artifact (verify with `gh attestation verify`).
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+
+      # Publish the draft. Publishing is what makes the release & tag immutable
+      # (requires "Enable release immutability" in repo Settings → Releases).
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: gh release edit "$TAG" --draft=false --latest

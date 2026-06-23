@@ -7,6 +7,7 @@
 package purl
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -32,7 +33,7 @@ type PURL struct {
 func Parse(raw string) (PURL, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return PURL{}, fmt.Errorf("purl: empty string")
+		return PURL{}, errors.New("purl: empty string")
 	}
 
 	parsed, err := packageurl.FromString(raw)
